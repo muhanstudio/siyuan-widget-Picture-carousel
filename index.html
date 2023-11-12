@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <style>
+      body {
+        width: auto;
+        height: 100vh;
+        overflow: hidden;
+      }
+
+      #carousel {
+        position: relative;
+        width: 100%;
+        height: 100%;
+        background-size: contain;
+        background-repeat: no-repeat;
+        transition: background-image 0.5s ease-in-out; /* 添加过渡效果 */
+      }
+
+      #gear {
+        position: absolute;
+        bottom: 10px;
+        right: 10px;
+        opacity: 0; /* 初始状态下隐藏元素 */
+        transition: opacity 0.3s; /* 添加过渡效果（可选） */
+      }
+
+      #gear:hover {
+        opacity: 1; /* 在悬停时显示元素 */
+      }
+    </style>
+  </head>
+  <body>
+    <div id="carousel">
+      <div id="gear">
+        <button onclick="document.getElementById('upload').click()">
+          上传图片
+        </button>
+        <input
+          type="file"
+          id="upload"
+          style="display: none"
+          multiple
+          onchange="uploadImages(event)"
+        />
+        <button onclick="previousImage()">上一张</button>
+        <button onclick="nextImage()">下一张</button>
+        <button onclick="toggleCarousel()">暂停/开始轮播</button>
+        <button onclick="saveImage()">保存图片</button>
+        <div id="speedControl">
+          <input
+            type="range"
+            min="0"
+            max="5000"
+            value="2000"
+            step="100"
+            oninput="changeSpeed(this.value)"
+          />
+          <span id="speedValue">2000ms</span>
+        </div>
+      </div>
+    </div>
+    <script>
+      let images = [];
+      let currentIndex = 0;
+      let isCarouselRunning = true;
+      let carouselInterval;
+      const id =
+        window.frameElement.parentElement.parentElement.getAttribute(
+          "data-node-id"
+        );
+      const idpath = id + "/";
+      const carousel = document.getElementById("carousel");
+
+      function fetchImages() {
+        fetch("/api/file/readDir", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            path: "/data/widgets/Picture-carousel/assets/" + idpath,
+          }),
+        })
+          .then((response) => response.json())
+          .then((data) => {
+            if (data.code === 0) {
+              images = data.data
+                .filter((item) => !item.isDir)
+                .map((item) => "./assets/" + idpath + item.name);
+              carousel.style.backgroundImage = "url(" + images[0] + ")";
+            }
+          });
+      }
+
+      function uploadImages(event) {
+        const files = event.target.files;
+        const formData = new FormData();
+        formData.append(
+          "assetsDirPath",
+          "/widgets/Picture-carousel/assets/" + idpath
+        );
+
+        for (let i = 0; i < files.length; i++) {
+          formData.append("file[]", files[i]);
+        }
+
+        fetch("/api/asset/upload", {
+          method: "POST",
+          body: formData,
+        }).then(() => {
+          fetchImages();
+        });
+      }
+
+      function previousImage() {
+        currentIndex = (currentIndex - 1 + images.length) % images.length;
+        carousel.style.backgroundImage = "url(" + images[currentIndex] + ")";
+      }
+
+      function nextImage() {
+        if (!isCarouselRunning) {
+          return;
+        }
+        currentIndex = (currentIndex + 1) % images.length;
+        carousel.style.backgroundImage = "url(" + images[currentIndex] + ")";
+      }
+
+      function toggleCarousel() {
+        isCarouselRunning = !isCarouselRunning;
+      }
+
+      function saveImage() {
+        const link = document.createElement("a");
+        link.href = images[currentIndex];
+        link.download = "image.jpg";
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      }
+
+      function changeSpeed(speed) {
+        clearInterval(ff);
+        ff = setInterval(nextImage, speed);
+        document.getElementById("speedValue").textContent = speed + "ms";
+      }
+
+      let ff = setInterval(nextImage, 2000);
+      fetchImages();
+    </script>
+  </body>
+</html>
